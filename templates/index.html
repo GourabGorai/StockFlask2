@@ -1,10 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Price Prediction</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-$END$
+    <div class="container">
+        <h1>Stock Price Prediction</h1>
+        <form method="POST">
+            <label for="symbol">Stock Symbol:</label>
+            <input type="text" id="symbol" name="symbol" required>
+
+            <label for="currency">Currency (USD or INR):</label>
+            <input type="text" id="currency" name="currency" required>
+
+            <label for="future_date">Future Date (YYYY-MM-DD):</label>
+            <input type="date" id="future_date" name="future_date" required>
+
+            <button type="submit">Predict</button>
+        </form>
+
+        {% if predicted_price %}
+        <div class="result">
+            <h2>Predicted Stock Price on {{ future_date }}: {{ predicted_price }} {{ currency }}</h2>
+            {% if actual_price %}
+                <h3>Actual Stock Price: {{ actual_price }} {{ currency }}</h3>
+            {% else %}
+                <h3>No actual price data available.</h3>
+            {% endif %}
+            <img src="{{ plot_url }}" alt="Stock Price Plot">
+        </div>
+        {% endif %}
+
+        {% if error_message %}
+        <div class="error">
+            <p>{{ error_message }}</p>
+        </div>
+        {% endif %}
+    </div>
 </body>
 </html>
