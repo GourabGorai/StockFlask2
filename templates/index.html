@@ -4,41 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Price Prediction</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>Stock Price Prediction</h1>
-        <form method="POST">
-            <label for="symbol">Stock Symbol:</label>
-            <input type="text" id="symbol" name="symbol" required>
+    <h1>Stock Price Prediction</h1>
+    <form method="POST">
+        <label for="symbol">Stock Symbol:</label>
+        <input type="text" id="symbol" name="symbol" required>
+        <br><br>
+        <label for="future_date">Enter Future Date (YYYY-MM-DD):</label>
+        <input type="date" id="future_date" name="future_date">
+        <br><br>
+        <input type="submit" value="Predict">
+    </form>
 
-            <label for="currency">Currency (USD or INR):</label>
-            <input type="text" id="currency" name="currency" required>
+    {% if error_message %}
+        <p style="color: red;">{{ error_message }}</p>
+    {% endif %}
 
-            <label for="future_date">Future Date (YYYY-MM-DD):</label>
-            <input type="date" id="future_date" name="future_date" required>
+    {% if future_prediction %}
+        <h2>Future Prediction</h2>
+        <p>Predicted price for {{ request.form['future_date'] }}: {{ future_prediction }}</p>
+    {% endif %}
 
-            <button type="submit">Predict</button>
-        </form>
+    {% if accuracy_score %}
+        <h2>Model Accuracy</h2>
+        <p>R² Score: {{ accuracy_score }}</p>
+    {% endif %}
 
-        {% if predicted_price %}
-        <div class="result">
-            <h2>Predicted Stock Price on {{ future_date }}: {{ predicted_price }} {{ currency }}</h2>
-            {% if actual_price %}
-                <h3>Actual Stock Price: {{ actual_price }} {{ currency }}</h3>
-            {% else %}
-                <h3>No actual price data available.</h3>
-            {% endif %}
-            <img src="{{ plot_url }}" alt="Stock Price Plot">
-        </div>
-        {% endif %}
-
-        {% if error_message %}
-        <div class="error">
-            <p>{{ error_message }}</p>
-        </div>
-        {% endif %}
-    </div>
+    {% if plot_url %}
+        <h2>Predicted vs Actual Prices</h2>
+        <img src="{{ plot_url }}" alt="Predicted vs Actual Prices">
+    {% endif %}
 </body>
 </html>

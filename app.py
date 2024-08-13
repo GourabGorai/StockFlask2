@@ -1,19 +1,18 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request
 import pandas as pd
 import numpy as np
-from datetime import datetime
-from sklearn.tree import DecisionTreeRegressor
+from datetime import datetime, timedelta
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import requests
 import matplotlib.pyplot as plt
 import os
+from sklearn.metrics import r2_score
 
 app = Flask(__name__)
 
 API_KEY = 'FVOEWU64HKN1C9U2'
-EXCHANGE_RATE_API_KEY = '699cc6dc962264a2fc44c056'
 STOCK_BASE_URL = 'https://www.alphavantage.co/query'
-EXCHANGE_RATE_BASE_URL = 'https://v6.exchangerate-api.com/v6'
 
 
 def calculate_rsi(df, period=14):
@@ -44,31 +43,32 @@ def add_technical_indicators(df):
     return df
 
 
-def train_decision_tree(df, currency='USD'):
+def train_random_forest(df):
     df = add_technical_indicators(df)
 
+    # Features and target variable
     X = df[['Close', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
-    y = df['Close']
+    y = df['Close'].shift(-1)  # Predict the next day's closing price
 
-    if currency == 'INR':
-        X = df[['Close_INR', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
-        y = df['Close_INR']
+    # Remove the last row with NaN target
+    X = X[:-1]
+    y = y[:-1]
 
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
 
-    model = DecisionTreeRegressor(random_state=42)
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X, y)
 
     return model, scaler
 
 
-def fetch_future_price_from_api(symbol, future_date, api_key):
+def fetch_stock_data(symbol):
     params = {
         'function': 'TIME_SERIES_DAILY',
         'symbol': symbol,
         'outputsize': 'full',
-        'apikey': api_key
+        'apikey': API_KEY
     }
 
     response = requests.get(STOCK_BASE_URL, params=params)
@@ -76,28 +76,31 @@ def fetch_future_price_from_api(symbol, future_date, api_key):
 
     if 'Time Series (Daily)' in data:
         time_series = data['Time Series (Daily)']
-        future_date_str = future_date.strftime('%Y-%m-%d')
-        if future_date_str in time_series:
-            actual_price = time_series[future_date_str]['4. close']
-            return float(actual_price)
+        df = pd.DataFrame.from_dict(time_series, orient='index')
+        df.index = pd.to_datetime(df.index)
+        df = df.sort_index()
+        df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+
+        df['Open'] = df['Open'].astype(float)
+        df['High'] = df['High'].astype(float)
+        df['Low'] = df['Low'].astype(float)
+        df['Close'] = df['Close'].astype(float)
+
+        return df
 
     return None
 
 
-def plot_prices(future_date, predicted_price, actual_price=None):
-    dates = [future_date]
-    prices = [predicted_price]
-    labels = ['Predicted']
-
-    if actual_price is not None:
-        prices.append(actual_price)
-        labels.append('Actual')
-
-    plt.figure(figsize=(10, 6))
-    plt.bar(labels, prices, color=['blue', 'green'])
-    plt.title(f'Stock Price on {future_date}')
+def plot_prices(dates, predicted_prices, actual_prices):
+    plt.figure(figsize=(12, 6))
+    plt.plot(dates, predicted_prices, label='Predicted Prices', color='blue', marker='o')
+    plt.plot(dates, actual_prices, label='Actual Prices', color='green', marker='x')
+    plt.title('Stock Prices: Predicted vs Actual')
+    plt.xlabel('Date')
     plt.ylabel('Price')
-    plt.xlabel('Type')
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.tight_layout()
 
     plot_filename = 'static/plot.png'
     if os.path.exists(plot_filename):
@@ -110,74 +113,70 @@ def plot_prices(future_date, predicted_price, actual_price=None):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    predicted_prices = []
+    actual_prices = []
+    error_message = None
+    future_dates = []
+    future_prediction = None
+    accuracy_score = None
+
     if request.method == 'POST':
         symbol = request.form['symbol'].upper()
-        currency = request.form['currency'].upper()
-        future_date_str = request.form['future_date']
-        future_date = datetime.strptime(future_date_str, '%Y-%m-%d')
+        future_date_str = request.form.get('future_date', '')
 
-        # Step 1: Fetch the exchange rate (USD to INR)
-        exchange_rate_response = requests.get(f"{EXCHANGE_RATE_BASE_URL}/{EXCHANGE_RATE_API_KEY}/latest/USD")
-        exchange_rate_data = exchange_rate_response.json()
-        usd_to_inr = exchange_rate_data['conversion_rates']['INR']
+        # Fetch the stock data from Alpha Vantage
+        df = fetch_stock_data(symbol)
 
-        # Step 2: Fetch the stock data from Alpha Vantage
-        params = {
-            'function': 'TIME_SERIES_DAILY',
-            'symbol': symbol,
-            'outputsize': 'full',
-            'apikey': API_KEY
-        }
+        if df is not None:
+            # Train the model
+            model, scaler = train_random_forest(df)
 
-        response = requests.get(STOCK_BASE_URL, params=params)
-        data = response.json()
+            if future_date_str:
+                future_date = pd.to_datetime(future_date_str)
+                last_date = df.index[-1]
 
-        if 'Time Series (Daily)' in data:
-            time_series = data['Time Series (Daily)']
-            df = pd.DataFrame.from_dict(time_series, orient='index')
-            df.index = pd.to_datetime(df.index)
-            df = df.sort_index()
-            df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+                if future_date > last_date:
+                    # Prepare data for future date prediction
+                    last_row = df.iloc[-1][['Close', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
+                    last_row_df = pd.DataFrame([last_row])
+                    last_row_scaled = scaler.transform(last_row_df)
 
-            df['Open'] = df['Open'].astype(float)
-            df['High'] = df['High'].astype(float)
-            df['Low'] = df['Low'].astype(float)
-            df['Close'] = df['Close'].astype(float)
+                    # Predict the price for the future date
+                    future_prediction = model.predict(last_row_scaled)[0]
 
-            df['Open_INR'] = df['Open'] * usd_to_inr
-            df['High_INR'] = df['High'] * usd_to_inr
-            df['Low_INR'] = df['Low'] * usd_to_inr
-            df['Close_INR'] = df['Close'] * usd_to_inr
+            # Generate dates from January 1st to today
+            start_date = datetime(2024, 1, 1)
+            end_date = datetime.now()
+            date_range = pd.date_range(start=start_date, end=end_date)
 
-            # Step 3: Train the model
-            model, scaler = train_decision_tree(df, currency=currency)
+            # Prepare data for predictions
+            for date in date_range:
+                if date in df.index:
+                    last_row = df.loc[date][['Close', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
+                    last_row_df = pd.DataFrame([last_row])
+                    last_row_scaled = scaler.transform(last_row_df)
 
-            # Step 4: Predict the stock price for the future date
-            last_row = df.iloc[-1][
-                ['Close', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD',
-                 'MACD_signal']] if currency == 'USD' else \
-                df.iloc[-1][['Close_INR', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
+                    # Predict the next day's price
+                    predicted_price = model.predict(last_row_scaled)[0]
+                    predicted_prices.append(predicted_price)
+                    actual_prices.append(df.loc[date]['Close'])
+                    future_dates.append(date)
 
-            last_row_df = pd.DataFrame([last_row])
-            last_row_scaled = scaler.transform(last_row_df)
-            predicted_price = model.predict(last_row_scaled)[0]
+            # Calculate accuracy score
+            accuracy_score = r2_score(actual_prices, predicted_prices)*100
 
-            # Step 5: Fetch the actual price from the API for the future date
-            actual_price = fetch_future_price_from_api(symbol, future_date, API_KEY)
+            # Plot the prices
+            plot_filename = plot_prices(future_dates, predicted_prices, actual_prices)
 
-            # Step 6: Plot the prices
-            plot_filename = plot_prices(future_date_str, predicted_price, actual_price)
-
-            return render_template('index.html', predicted_price=predicted_price, future_date=future_date_str,
-                                   currency=currency, actual_price=actual_price, plot_url=plot_filename)
+            return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
+                                   future_dates=future_dates, plot_url=plot_filename, future_prediction=future_prediction,
+                                   accuracy_score=accuracy_score)
 
         else:
-            error_message = data.get('Error Message') or data.get('Note') or data.get(
-                'Information') or "An unknown error occurred."
-            return render_template('index.html', error_message=error_message)
+            error_message = "Failed to fetch stock data. Please check the stock symbol."
 
-    return render_template('index.html')
-
-
+    return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
+                           future_dates=future_dates, error_message=error_message, future_prediction=future_prediction,
+                           accuracy_score=accuracy_score)
 if __name__ == '__main__':
     app.run(debug=True)
