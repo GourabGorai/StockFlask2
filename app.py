@@ -159,6 +159,9 @@ def index():
                     # Predict the price for the future date
                     future_prediction = model.predict(last_row_scaled)[0]
 
+                    # Print the predicted value for the user-entered future date
+                    print(f"The prediction for {future_date.strftime('%Y-%m-%d')}, is {future_prediction}")
+
             # Generate dates from January 1st to today
             start_date = datetime(2024, 1, 1)
             end_date = datetime.now()
