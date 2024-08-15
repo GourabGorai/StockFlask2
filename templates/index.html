@@ -6,34 +6,43 @@
     <title>Stock Price Prediction</title>
 </head>
 <body>
-    <h1>Stock Price Prediction</h1>
-    <form method="POST">
-        <label for="symbol">Stock Symbol:</label>
-        <input type="text" id="symbol" name="symbol" required>
-        <br><br>
-        <label for="future_date">Enter Future Date (YYYY-MM-DD):</label>
-        <input type="date" id="future_date" name="future_date">
-        <br><br>
-        <input type="submit" value="Predict">
-    </form>
+    <div class="container mt-5">
+        <h1 class="text-center">Stock Price Prediction</h1>
+        <form method="POST" action="/" class="mt-4">
+            <div class="form-group">
+                <label for="symbol">Stock Symbol:</label>
+                <input type="text" class="form-control" id="symbol" name="symbol" placeholder="Enter stock symbol" required>
+            </div>
+            <div class="form-group">
+                <label for="future_date">Future Date:</label>
+                <input type="date" class="form-control" id="future_date" name="future_date" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Predict</button>
+        </form>
 
-    {% if error_message %}
-        <p style="color: red;">{{ error_message }}</p>
-    {% endif %}
+        {% if error_message %}
+        <div class="alert alert-danger mt-4" role="alert">
+            {{ error_message }}
+        </div>
+        {% endif %}
 
-    {% if future_prediction %}
-        <h2>Future Prediction</h2>
-        <p>Predicted price for {{ request.form['future_date'] }}: {{ future_prediction }}</p>
-    {% endif %}
+        {% if future_prediction %}
+        <div class="alert alert-info mt-4" role="alert">
+            <strong>Prediction for {{ future_dates[-1].strftime('%Y-%m-%d') }}:</strong> ${{ future_prediction }}
+        </div>
+        {% endif %}
 
-    {% if accuracy_score %}
-        <h2>Model Accuracy</h2>
-        <p>R² Score: {{ accuracy_score }}</p>
-    {% endif %}
+        {% if accuracy_score %}
+        <div class="alert alert-success mt-4" role="alert">
+            <strong>Prediction Accuracy:</strong> {{ accuracy_score }}%
+        </div>
+        {% endif %}
 
-    {% if plot_url %}
-        <h2>Predicted vs Actual Prices</h2>
-        <img src="{{ plot_url }}" alt="Predicted vs Actual Prices">
-    {% endif %}
+        {% if plot_url %}
+        <div class="mt-4">
+            <img src="{{ plot_url }}" alt="Stock Prices: Predicted vs Actual" class="img-fluid">
+        </div>
+        {% endif %}
+    </div>
 </body>
 </html>

@@ -13,7 +13,8 @@ app = Flask(__name__)
 
 API_KEY = 'FVOEWU64HKN1C9U2'
 STOCK_BASE_URL = 'https://www.alphavantage.co/query'
-
+HOLIDAY_API_KEY = '49339829-1b08-49a6-b341-72f937bb885f'
+HOLIDAY_API_URL = 'https://holidayapi.com/v1/holidays'
 
 def calculate_rsi(df, period=14):
     delta = df['Close'].diff()
@@ -23,14 +24,12 @@ def calculate_rsi(df, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-
 def calculate_macd(df, fast_period=12, slow_period=26, signal_period=9):
     df['EMA_fast'] = df['Close'].ewm(span=fast_period, adjust=False).mean()
     df['EMA_slow'] = df['Close'].ewm(span=slow_period, adjust=False).mean()
     df['MACD'] = df['EMA_fast'] - df['EMA_slow']
     df['MACD_signal'] = df['MACD'].ewm(span=signal_period, adjust=False).mean()
     return df
-
 
 def add_technical_indicators(df):
     df['MA_5'] = df['Close'].rolling(window=5).mean()
@@ -41,7 +40,6 @@ def add_technical_indicators(df):
     df = calculate_macd(df)
     df.fillna(0, inplace=True)
     return df
-
 
 def train_random_forest(df):
     df = add_technical_indicators(df)
@@ -61,7 +59,6 @@ def train_random_forest(df):
     model.fit(X, y)
 
     return model, scaler
-
 
 def fetch_stock_data(symbol):
     params = {
@@ -90,7 +87,6 @@ def fetch_stock_data(symbol):
 
     return None
 
-
 def plot_prices(dates, predicted_prices, actual_prices):
     plt.figure(figsize=(12, 6))
     plt.plot(dates, predicted_prices, label='Predicted Prices', color='blue', marker='o')
@@ -110,6 +106,17 @@ def plot_prices(dates, predicted_prices, actual_prices):
 
     return plot_filename
 
+def is_holiday(date, country='US'):
+    params = {
+        'key': HOLIDAY_API_KEY,
+        'country': country,
+        'year': date.year,
+        'month': date.month,
+        'day': date.day,
+    }
+    response = requests.get(HOLIDAY_API_URL, params=params)
+    holidays = response.json().get('holidays', [])
+    return len(holidays) > 0
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -133,6 +140,14 @@ def index():
 
             if future_date_str:
                 future_date = pd.to_datetime(future_date_str)
+
+                # Check if the entered date is a holiday
+                if is_holiday(future_date):
+                    error_message = f"There is a holiday on {future_date.strftime('%Y-%m-%d')}. No prediction available."
+                    return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
+                                           future_dates=future_dates, error_message=error_message, future_prediction=future_prediction,
+                                           accuracy_score=accuracy_score)
+
                 last_date = df.index[-1]
 
                 if future_date > last_date:
@@ -178,5 +193,6 @@ def index():
     return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
                            future_dates=future_dates, error_message=error_message, future_prediction=future_prediction,
                            accuracy_score=accuracy_score)
+
 if __name__ == '__main__':
     app.run(debug=True)
