@@ -157,7 +157,7 @@ def index():
                     last_row_scaled = scaler.transform(last_row_df)
 
                     # Predict the price for the future date
-                    future_prediction = model.predict(last_row_scaled)[0]
+                    future_prediction = round(model.predict(last_row_scaled)[0],2)
 
                     # Print the predicted value for the user-entered future date
                     print(f"The prediction for {future_date.strftime('%Y-%m-%d')}, is {future_prediction}")
@@ -181,7 +181,7 @@ def index():
                     future_dates.append(date)
 
             # Calculate accuracy score
-            accuracy_score = r2_score(actual_prices, predicted_prices)*100
+            accuracy_score = round(r2_score(actual_prices, predicted_prices)*100,2)
 
             # Plot the prices
             plot_filename = plot_prices(future_dates, predicted_prices, actual_prices)
