@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import requests
@@ -135,32 +134,33 @@ def index():
         df = fetch_stock_data(symbol)
 
         if df is not None:
+            # Apply technical indicators
+            df = add_technical_indicators(df)
+            df2 = df[df.index <= '2023-12-29']  # Use data until 2023-12-29
+
             # Train the model
-            model, scaler = train_random_forest(df)
+            model, scaler = train_random_forest(df2)
 
             if future_date_str:
                 future_date = pd.to_datetime(future_date_str)
+                last_date = df.index[-1]
 
-                # Check if the entered date is a holiday
-                if is_holiday(future_date):
-                    error_message = f"There is a holiday on {future_date.strftime('%Y-%m-%d')}. No prediction available."
+                if future_date <= last_date or is_holiday(future_date):
+                    error_message = "No prediction available."
                     return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
                                            future_dates=future_dates, error_message=error_message, future_prediction=future_prediction,
                                            accuracy_score=accuracy_score)
 
-                last_date = df.index[-1]
+                # Prepare data for future date prediction
+                last_row = df.iloc[-1][['Close', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
+                last_row_df = pd.DataFrame([last_row])
+                last_row_scaled = scaler.transform(last_row_df)
 
-                if future_date > last_date:
-                    # Prepare data for future date prediction
-                    last_row = df.iloc[-1][['Close', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
-                    last_row_df = pd.DataFrame([last_row])
-                    last_row_scaled = scaler.transform(last_row_df)
+                # Predict the price for the future date
+                future_prediction = round(model.predict(last_row_scaled)[0], 2)
 
-                    # Predict the price for the future date
-                    future_prediction = round(model.predict(last_row_scaled)[0],2)
-
-                    # Print the predicted value for the user-entered future date
-                    print(f"The prediction for {future_date.strftime('%Y-%m-%d')}, is {future_prediction}")
+                # Print the predicted value for the user-entered future date
+                print(f"The prediction for {future_date.strftime('%Y-%m-%d')}, is {future_prediction}")
 
             # Generate dates from January 1st to today
             start_date = datetime(2024, 1, 1)
@@ -181,7 +181,7 @@ def index():
                     future_dates.append(date)
 
             # Calculate accuracy score
-            accuracy_score = round(r2_score(actual_prices, predicted_prices)*100,2)
+            accuracy_score = round(r2_score(actual_prices, predicted_prices) * 100, 2)
 
             # Plot the prices
             plot_filename = plot_prices(future_dates, predicted_prices, actual_prices)
