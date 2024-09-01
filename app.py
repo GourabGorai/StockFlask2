@@ -88,8 +88,8 @@ def fetch_stock_data(symbol):
 
 def plot_prices(dates, predicted_prices, actual_prices):
     plt.figure(figsize=(12, 6))
-    plt.plot(dates, predicted_prices, label='Predicted Prices', color='blue', marker='o')
-    plt.plot(dates, actual_prices, label='Actual Prices', color='green', marker='x')
+    plt.plot(dates, predicted_prices, label='Predicted Prices', color='blue')
+    plt.plot(dates, actual_prices, label='Actual Prices', color='green')
     plt.title('Stock Prices: Predicted vs Actual')
     plt.xlabel('Date')
     plt.ylabel('Price')
@@ -129,14 +129,14 @@ def index():
     if request.method == 'POST':
         symbol = request.form['symbol'].upper()
         future_date_str = request.form.get('future_date', '')
-
+        year_prv = datetime.now().year-1
         # Fetch the stock data from Alpha Vantage
         df = fetch_stock_data(symbol)
 
         if df is not None:
             # Apply technical indicators
             df = add_technical_indicators(df)
-            df2 = df[df.index <= '2023-12-29']  # Use data until 2023-12-29
+            df2 = df[df.index <= f'{year_prv}-12-29']  # Use data until 2023-12-29
 
             # Train the model
             model, scaler = train_random_forest(df2)
