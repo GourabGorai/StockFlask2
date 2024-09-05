@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import requests
@@ -24,18 +24,18 @@ def calculate_rsi(df, period=14):
     return rsi
 
 def calculate_macd(df, fast_period=12, slow_period=26, signal_period=9):
-    df['EMA_fast'] = df['Close'].ewm(span=fast_period, adjust=False).mean()
-    df['EMA_slow'] = df['Close'].ewm(span=slow_period, adjust=False).mean()
-    df['MACD'] = df['EMA_fast'] - df['EMA_slow']
-    df['MACD_signal'] = df['MACD'].ewm(span=signal_period, adjust=False).mean()
+    df.loc[:, 'EMA_fast'] = df['Close'].ewm(span=fast_period, adjust=False).mean()
+    df.loc[:, 'EMA_slow'] = df['Close'].ewm(span=slow_period, adjust=False).mean()
+    df.loc[:, 'MACD'] = df['EMA_fast'] - df['EMA_slow']
+    df.loc[:, 'MACD_signal'] = df['MACD'].ewm(span=signal_period, adjust=False).mean()
     return df
 
 def add_technical_indicators(df):
-    df['MA_5'] = df['Close'].rolling(window=5).mean()
-    df['MA_10'] = df['Close'].rolling(window=10).mean()
-    df['MA_50'] = df['Close'].rolling(window=50).mean()
-    df['Volatility'] = df['High'] - df['Low']
-    df['RSI'] = calculate_rsi(df)
+    df.loc[:, 'MA_5'] = df['Close'].rolling(window=5).mean()
+    df.loc[:, 'MA_10'] = df['Close'].rolling(window=10).mean()
+    df.loc[:, 'MA_50'] = df['Close'].rolling(window=50).mean()
+    df.loc[:, 'Volatility'] = df['High'] - df['Low']
+    df.loc[:, 'RSI'] = calculate_rsi(df)
     df = calculate_macd(df)
     df.fillna(0, inplace=True)
     return df
@@ -129,7 +129,7 @@ def index():
     if request.method == 'POST':
         symbol = request.form['symbol'].upper()
         future_date_str = request.form.get('future_date', '')
-        year_prv = datetime.now().year-1
+        year_prv = datetime.now().year - 1
         # Fetch the stock data from Alpha Vantage
         df = fetch_stock_data(symbol)
 
@@ -151,16 +151,41 @@ def index():
                                            future_dates=future_dates, error_message=error_message, future_prediction=future_prediction,
                                            accuracy_score=accuracy_score)
 
-                # Prepare data for future date prediction
-                last_row = df.iloc[-1][['Close', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
-                last_row_df = pd.DataFrame([last_row])
-                last_row_scaled = scaler.transform(last_row_df)
+                # Simulate future data for the given future date
+                future_df = df.copy()
+                current_date = last_date
 
-                # Predict the price for the future date
-                future_prediction = round(model.predict(last_row_scaled)[0], 2)
+                while current_date < future_date:
+                    next_row = future_df.iloc[-1][['Close', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
+                    next_row_df = pd.DataFrame([next_row])
+                    next_row_scaled = scaler.transform(next_row_df)
 
-                # Print the predicted value for the user-entered future date
-                print(f"The prediction for {future_date.strftime('%Y-%m-%d')}, is {future_prediction}")
+                    # Predict the next day's closing price
+                    predicted_price = model.predict(next_row_scaled)[0]
+
+                    # Update the future_df with the predicted price and recalculate indicators
+                    next_date = current_date + timedelta(days=1)
+                    new_row = pd.Series({
+                        'Open': predicted_price,
+                        'High': predicted_price,
+                        'Low': predicted_price,
+                        'Close': predicted_price,
+                        'Volume': 0,
+                        'MA_5': 0,
+                        'MA_10': 0,
+                        'MA_50': 0,
+                        'Volatility': 0,
+                        'RSI': 0,
+                        'MACD': 0,
+                        'MACD_signal': 0,
+                    }, name=next_date)
+
+                    future_df = pd.concat([future_df, new_row.to_frame().T])
+                    future_df = add_technical_indicators(future_df)
+                    current_date = next_date
+
+                future_prediction = round(predicted_price, 2)
+                print(f"The prediction for {future_date_str} is {future_prediction}")
 
             # Generate dates from January 1st to today
             start_date = datetime(2024, 1, 1)
