@@ -4,9 +4,10 @@ from datetime import datetime, timedelta
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import requests
-import matplotlib.pyplot as plt
-import os
+import plotly.express as px
+import plotly.io as pio
 from sklearn.metrics import r2_score
+import os
 
 app = Flask(__name__)
 
@@ -87,21 +88,14 @@ def fetch_stock_data(symbol):
     return None
 
 def plot_prices(dates, predicted_prices, actual_prices):
-    plt.figure(figsize=(12, 6))
-    plt.plot(dates, predicted_prices, label='Predicted Prices', color='blue')
-    plt.plot(dates, actual_prices, label='Actual Prices', color='green')
-    plt.title('Stock Prices: Predicted vs Actual')
-    plt.xlabel('Date')
-    plt.ylabel('Price')
-    plt.xticks(rotation=45)
-    plt.legend()
-    plt.tight_layout()
+    fig = px.line(x=dates, y=[predicted_prices, actual_prices], labels={'x': 'Date', 'y': 'Price'})
+    fig.update_traces(mode='lines+markers')
+    fig.update_layout(title='Stock Prices: Predicted vs Actual', legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+    fig.data[0].name = 'Predicted Prices'
+    fig.data[1].name = 'Actual Prices'
 
-    plot_filename = 'static/plot.png'
-    if os.path.exists(plot_filename):
-        os.remove(plot_filename)  # Remove the old plot if it exists
-    plt.savefig(plot_filename)
-    plt.close()
+    plot_filename = 'static/plot.html'
+    pio.write_html(fig, file=plot_filename, auto_open=False)
 
     return plot_filename
 
@@ -216,7 +210,7 @@ def index():
                                    accuracy_score=accuracy_score)
 
         else:
-            error_message = "Failed to fetch stock data. Please check the stock symbol."
+            error_message = "Failed to fetch stock data. Please try again."
 
     return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
                            future_dates=future_dates, error_message=error_message, future_prediction=future_prediction,
