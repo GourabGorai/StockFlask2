@@ -88,16 +88,29 @@ def fetch_stock_data(symbol):
     return None
 
 def plot_prices(dates, predicted_prices, actual_prices):
-    fig = px.line(x=dates, y=[predicted_prices, actual_prices], labels={'x': 'Date', 'y': 'Price'})
+    fig = px.line(
+        x=dates,
+        y=[predicted_prices, actual_prices],
+        labels={'x': 'Date', 'y': 'Price'}
+    )
     fig.update_traces(mode='lines+markers')
-    fig.update_layout(title='Stock Prices: Predicted vs Actual', legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+    fig.update_layout(
+        title='Stock Prices: Predicted vs Actual',
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
     fig.data[0].name = 'Predicted Prices'
     fig.data[1].name = 'Actual Prices'
+
+    # Update hover template to show only "date" and "value"
+    hover_template = "<b>Date:</b> %{x}<br><b>Price:</b> %{y}"
+    for trace in fig.data:
+        trace.hovertemplate = hover_template
 
     plot_filename = 'static/plot.html'
     pio.write_html(fig, file=plot_filename, auto_open=False)
 
     return plot_filename
+
 
 def is_holiday(date, country='US'):
     params = {
