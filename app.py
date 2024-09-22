@@ -7,7 +7,6 @@ import requests
 import plotly.express as px
 import plotly.io as pio
 from sklearn.metrics import r2_score
-import os
 
 app = Flask(__name__)
 
