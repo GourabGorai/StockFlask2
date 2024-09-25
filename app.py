@@ -1,19 +1,72 @@
-from flask import Flask, render_template, request
-import pandas as pd
+from flask import Flask, render_template, request, redirect, url_for, session
+import random
+import smtplib
+import ssl
+import psycopg2
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import os
 from datetime import datetime, timedelta
+import pandas as pd
+import requests
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
-import requests
+from sklearn.metrics import r2_score
 import plotly.express as px
 import plotly.io as pio
-from sklearn.metrics import r2_score
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'
 
 API_KEY = 'FVOEWU64HKN1C9U2'
 STOCK_BASE_URL = 'https://www.alphavantage.co/query'
 HOLIDAY_API_KEY = '49339829-1b08-49a6-b341-72f937bb885f'
 HOLIDAY_API_URL = 'https://holidayapi.com/v1/holidays'
+
+def is_holiday(date, country='US'):
+    params = {
+        'key': HOLIDAY_API_KEY,
+        'country': country,
+        'year': date.year,
+        'month': date.month,
+        'day': date.day,
+    }
+    response = requests.get(HOLIDAY_API_URL, params=params)
+    holidays = response.json().get('holidays', [])
+    return len(holidays) > 0
+
+# Database connection function (adjust parameters based on your setup)
+def get_db_connection():
+    conn = psycopg2.connect(
+        host="localhost",
+        database="newDB",
+        user="postgres",
+        password="123456"
+    )
+    return conn
+
+def send_email(recipient_email, verification_code):
+    sender_email = "gourabtest469@gmail.com"
+    sender_password = "geslhgvynzwwqrsb"
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = "Your Verification Code"
+    message["From"] = sender_email
+    message["To"] = recipient_email
+
+    text = f"Your verification code is: {verification_code}"
+    part = MIMEText(text, "plain")
+    message.attach(part)
+
+    context = ssl.create_default_context()
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, recipient_email, message.as_string())
+        print("Verification code sent successfully.")
+    except Exception as e:
+        print(f"Error sending email: {e}")
 
 def calculate_rsi(df, period=14):
     delta = df['Close'].diff()
@@ -100,7 +153,6 @@ def plot_prices(dates, predicted_prices, actual_prices):
     fig.data[0].name = 'Predicted Prices'
     fig.data[1].name = 'Actual Prices'
 
-    # Update hover template to show only "date" and "value"
     hover_template = "<b>Date:</b> %{x}<br><b>Price:</b> %{y}"
     for trace in fig.data:
         trace.hovertemplate = hover_template
@@ -111,20 +163,63 @@ def plot_prices(dates, predicted_prices, actual_prices):
     return plot_filename
 
 
-def is_holiday(date, country='US'):
-    params = {
-        'key': HOLIDAY_API_KEY,
-        'country': country,
-        'year': date.year,
-        'month': date.month,
-        'day': date.day,
-    }
-    response = requests.get(HOLIDAY_API_URL, params=params)
-    holidays = response.json().get('holidays', [])
-    return len(holidays) > 0
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM userdata WHERE email = %s', (email,))
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if user:
+            return "Email already registered. Please login with a different email."
+        else:
+            verification_code = random.randint(100000, 999999)
+            send_email(email, verification_code)
+
+            # Store email, password, and verification code in the session temporarily
+            session['email'] = email
+            session['password'] = password
+            session['verification_code'] = str(verification_code)
+
+            return redirect(url_for('verify'))
+    return render_template('login.html')
+
+@app.route('/verify', methods=['GET', 'POST'])
+def verify():
+    if request.method == 'POST':
+        user_input_code = request.form['user_input_code']
+        if user_input_code == session.get('verification_code'):
+            # Save email and password to the database
+            email = session.get('email')
+            password = session.get('password')
+
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute('INSERT INTO userdata2 (email, password) VALUES (%s, %s)', (email, password))
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            # Clear session after successful verification
+            session.pop('verification_code', None)
+            session.pop('password', None)
+
+            return redirect(url_for('index'))
+        else:
+            return "Verification failed. Please try again."
+    return render_template('verify.html')
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    if 'email' not in session:
+        return redirect(url_for('login'))
+
     predicted_prices = []
     actual_prices = []
     error_message = None
@@ -136,13 +231,13 @@ def index():
         symbol = request.form['symbol'].upper()
         future_date_str = request.form.get('future_date', '')
         year_prv = datetime.now().year - 1
+
         # Fetch the stock data from Alpha Vantage
         df = fetch_stock_data(symbol)
 
         if df is not None:
-            # Apply technical indicators
             df = add_technical_indicators(df)
-            df2 = df[df.index <= f'{year_prv}-12-29']  # Use data until 2023-12-29
+            df2 = df[df.index <= f'{year_prv}-12-29']
 
             # Train the model
             model, scaler = train_random_forest(df2)
@@ -166,10 +261,8 @@ def index():
                     next_row_df = pd.DataFrame([next_row])
                     next_row_scaled = scaler.transform(next_row_df)
 
-                    # Predict the next day's closing price
                     predicted_price = model.predict(next_row_scaled)[0]
 
-                    # Update the future_df with the predicted price and recalculate indicators
                     next_date = current_date + timedelta(days=1)
                     new_row = pd.Series({
                         'Open': predicted_price,
@@ -177,13 +270,6 @@ def index():
                         'Low': predicted_price,
                         'Close': predicted_price,
                         'Volume': 0,
-                        'MA_5': 0,
-                        'MA_10': 0,
-                        'MA_50': 0,
-                        'Volatility': 0,
-                        'RSI': 0,
-                        'MACD': 0,
-                        'MACD_signal': 0,
                     }, name=next_date)
 
                     future_df = pd.concat([future_df, new_row.to_frame().T])
@@ -193,28 +279,22 @@ def index():
                 future_prediction = round(predicted_price, 2)
                 print(f"The prediction for {future_date_str} is {future_prediction}")
 
-            # Generate dates from January 1st to today
             start_date = datetime(2024, 1, 1)
             end_date = datetime.now()
             date_range = pd.date_range(start=start_date, end=end_date)
 
-            # Prepare data for predictions
             for date in date_range:
                 if date in df.index:
                     last_row = df.loc[date][['Close', 'MA_5', 'MA_10', 'MA_50', 'Volatility', 'RSI', 'MACD', 'MACD_signal']]
                     last_row_df = pd.DataFrame([last_row])
                     last_row_scaled = scaler.transform(last_row_df)
 
-                    # Predict the next day's price
                     predicted_price = model.predict(last_row_scaled)[0]
                     predicted_prices.append(predicted_price)
                     actual_prices.append(df.loc[date]['Close'])
                     future_dates.append(date)
 
-            # Calculate accuracy score
             accuracy_score = round(r2_score(actual_prices, predicted_prices) * 100, 2)
-
-            # Plot the prices
             plot_filename = plot_prices(future_dates, predicted_prices, actual_prices)
 
             return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
@@ -222,11 +302,10 @@ def index():
                                    accuracy_score=accuracy_score)
 
         else:
-            error_message = "Failed to fetch stock data. Please try again."
+            error_message = "Failed to fetch stock data."
 
     return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
-                           future_dates=future_dates, error_message=error_message, future_prediction=future_prediction,
-                           accuracy_score=accuracy_score)
+                           error_message=error_message, future_prediction=future_prediction, accuracy_score=accuracy_score)
 
 if __name__ == '__main__':
     app.run(debug=True)

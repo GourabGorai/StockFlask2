@@ -3,40 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Price Prediction</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <title>Stock Prediction</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
 </head>
 <body>
-    <div class="container">
-        <h1 class="mt-5">Stock Price Prediction</h1>
-        <form method="POST" class="mt-4">
-            <div class="form-group">
-                <label for="symbol">Stock Symbol:</label>
-                <input type="text" class="form-control" id="symbol" name="symbol" required>
+    <section class="section">
+        <div class="container">
+            <h1 class="title">Stock Price Prediction</h1>
+            <form action="/" method="POST">
+                <div class="field">
+                    <label class="label">Stock Symbol</label>
+                    <div class="control">
+                        <input class="input" type="text" name="symbol" placeholder="Enter stock symbol" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">Predict Future Date (optional)</label>
+                    <div class="control">
+                        <input class="input" type="date" name="future_date">
+                    </div>
+                </div>
+                <div class="control">
+                    <button class="button is-link" type="submit">Predict</button>
+                </div>
+            </form>
+
+            {% if future_prediction %}
+            <div class="notification is-info">
+                <strong>Future Prediction:</strong> The predicted price on {{ future_date_str }} is ${{ future_prediction }}.
             </div>
-            <div class="form-group">
-                <label for="future_date">Enter Future Date (YYYY-MM-DD):</label>
-                <input type="date" class="form-control" id="future_date" name="future_date">
+            {% endif %}
+
+            {% if error_message %}
+            <div class="notification is-danger">
+                {{ error_message }}
             </div>
-            <button type="submit" class="btn btn-primary">Predict</button>
-        </form>
+            {% endif %}
 
-        {% if error_message %}
-        <div class="alert alert-danger mt-4">{{ error_message }}</div>
-        {% endif %}
+            {% if accuracy_score %}
+            <div class="notification is-success">
+                <strong>Model Accuracy:</strong> {{ accuracy_score }}%
+            </div>
+            {% endif %}
 
-        {% if future_prediction %}
-        <div class="alert alert-success mt-4">Predicted Price for your entered Future date is : {{ future_prediction }}</div>
-        {% endif %}
-
-        {% if accuracy_score %}
-        <div class="alert alert-info mt-4">Accuracy Score: {{ accuracy_score }}%</div>
-        {% endif %}
-
-        {% if plot_url %}
-        <h3 class="mt-5">Predicted vs Actual Prices</h3>
-        <iframe src="{{ plot_url }}" width="100%" height="600" frameborder="0" class="mt-3"></iframe>
-        {% endif %}
-    </div>
+            {% if plot_url %}
+            <div class="box">
+                <h2 class="subtitle">Stock Price Graph</h2>
+                <iframe src="{{ plot_url }}" width="100%" height="600"></iframe>
+            </div>
+            {% endif %}
+        </div>
+    </section>
 </body>
 </html>
