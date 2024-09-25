@@ -165,29 +165,30 @@ def plot_prices(dates, predicted_prices, actual_prices):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Clear the session at the start of the route to ensure verification every time
+    session.clear()
+
     if request.method == 'POST':
         email = request.form['email']
-        password = request.form['password']
 
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute('SELECT * FROM userdata WHERE email = %s', (email,))
+        cur.execute('SELECT * FROM userdata2 WHERE email = %s', (email,))
         user = cur.fetchone()
         cur.close()
         conn.close()
 
         if user:
-            return "Email already registered. Please login with a different email."
-        else:
             verification_code = random.randint(100000, 999999)
             send_email(email, verification_code)
 
-            # Store email, password, and verification code in the session temporarily
+            # Store email and verification code in the session temporarily
             session['email'] = email
-            session['password'] = password
             session['verification_code'] = str(verification_code)
 
             return redirect(url_for('verify'))
+        else:
+            return "Email not registered. Please sign up first."
     return render_template('login.html')
 
 @app.route('/verify', methods=['GET', 'POST'])
@@ -195,20 +196,12 @@ def verify():
     if request.method == 'POST':
         user_input_code = request.form['user_input_code']
         if user_input_code == session.get('verification_code'):
-            # Save email and password to the database
-            email = session.get('email')
-            password = session.get('password')
-
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute('INSERT INTO userdata2 (email, password) VALUES (%s, %s)', (email, password))
-            conn.commit()
-            cur.close()
-            conn.close()
-
             # Clear session after successful verification
-            session.pop('verification_code', None)
-            session.pop('password', None)
+            email = session.get('email')
+            session.clear()
+
+            # Store email in the session for the current visit
+            session['email'] = email
 
             return redirect(url_for('index'))
         else:
