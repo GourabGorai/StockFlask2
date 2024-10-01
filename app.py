@@ -5,7 +5,6 @@ import ssl
 import psycopg2
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import os
 from datetime import datetime, timedelta
 import pandas as pd
 import requests
