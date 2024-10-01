@@ -169,15 +169,15 @@ def login():
 
     if request.method == 'POST':
         email = request.form['email']
+        password = request.form['password']  # Get password from form
 
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute('SELECT * FROM userdata2 WHERE email = %s', (email,))
         user = cur.fetchone()
-        cur.close()
-        conn.close()
 
         if user:
+            # Email exists, proceed with email verification
             verification_code = random.randint(100000, 999999)
             send_email(email, verification_code)
 
@@ -185,9 +185,24 @@ def login():
             session['email'] = email
             session['verification_code'] = str(verification_code)
 
+            cur.close()
+            conn.close()
+
             return redirect(url_for('verify'))
         else:
-            return "Email not registered. Please sign up first."
+            # Email does not exist, create new user after verification
+            verification_code = random.randint(100000, 999999)
+            send_email(email, verification_code)
+
+            # Temporarily store email, password, and verification code in the session
+            session['email'] = email
+            session['password'] = password
+            session['verification_code'] = str(verification_code)
+
+            cur.close()
+            conn.close()
+
+            return redirect(url_for('verify'))
     return render_template('login.html')
 
 @app.route('/verify', methods=['GET', 'POST'])
@@ -195,8 +210,24 @@ def verify():
     if request.method == 'POST':
         user_input_code = request.form['user_input_code']
         if user_input_code == session.get('verification_code'):
-            # Clear session after successful verification
             email = session.get('email')
+            password = session.get('password')
+
+            # Check if user exists in the database
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM userdata2 WHERE email = %s', (email,))
+            user = cur.fetchone()
+
+            if not user and password:
+                # If user doesn't exist, add to database after verification
+                cur.execute('INSERT INTO userdata2 (email, password) VALUES (%s, %s)', (email, password))
+                conn.commit()
+
+            cur.close()
+            conn.close()
+
+            # Clear session after successful verification
             session.clear()
 
             # Store email in the session for the current visit
