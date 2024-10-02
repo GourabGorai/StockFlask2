@@ -13,6 +13,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
 import plotly.express as px
 import plotly.io as pio
+import numpy as np
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
@@ -161,6 +162,69 @@ def plot_prices(dates, predicted_prices, actual_prices):
 
     return plot_filename
 
+def create_stockhistory_table_if_not_exists():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS stockhistory (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255),
+            stock_symbol VARCHAR(10),
+            prediction_date DATE,
+            prediction_timestamp TIMESTAMP,
+            predicted_value FLOAT
+        )
+    ''')
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def add_timestamp_column_if_missing():
+    create_stockhistory_table_if_not_exists()
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='stockhistory' AND column_name='prediction_timestamp';
+    """)
+    column_exists = cur.fetchone()
+
+    if not column_exists:
+        cur.execute("""
+            ALTER TABLE stockhistory 
+            ADD COLUMN prediction_timestamp TIMESTAMP;
+        """)
+        conn.commit()
+
+    cur.close()
+    conn.close()
+
+def log_prediction_to_db(email, symbol, future_date, predicted_value):
+    add_timestamp_column_if_missing()
+
+    if isinstance(predicted_value, np.float64):
+        predicted_value = float(predicted_value)
+
+    current_timestamp = datetime.now()
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute('''
+        INSERT INTO stockhistory (email, stock_symbol, prediction_date, prediction_timestamp, predicted_value)
+        VALUES (%s, %s, %s, %s, %s)
+    ''', (email, symbol, future_date, current_timestamp, predicted_value))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+email=None
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -301,6 +365,7 @@ def index():
 
                 future_prediction = round(predicted_price, 2)
                 print(f"The prediction for {future_date_str} is {future_prediction}")
+                log_prediction_to_db(session['email'], symbol, future_date, future_prediction)
 
             start_date = datetime(2024, 1, 1)
             end_date = datetime.now()
@@ -316,6 +381,7 @@ def index():
                     predicted_prices.append(predicted_price)
                     actual_prices.append(df.loc[date]['Close'])
                     future_dates.append(date)
+
 
             accuracy_score = round(r2_score(actual_prices, predicted_prices) * 100, 2)
             plot_filename = plot_prices(future_dates, predicted_prices, actual_prices)
