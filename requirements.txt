@@ -3,6 +3,6 @@ pandas
 requests
 scikit-learn
 psycopg2
-smtplib
+smtplib 8.8.4
 email
 plotly
