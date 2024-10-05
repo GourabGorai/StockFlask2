@@ -35,15 +35,13 @@ def is_holiday(date, country='US'):
     holidays = response.json().get('holidays', [])
     return len(holidays) > 0
 
-# Database connection function (adjust parameters based on your setup)
 def get_db_connection():
     conn = psycopg2.connect(
-        host="localhost",
-        database="newDB",
-        user="postgres",
-        password="123456"
+        "postgres://avnadmin:AVNS_HjYF1YDB0ilME5gCWBC@pg-2ff69ed5-gourabg30march-ae98.l.aivencloud.com:28031/defaultdb?sslmode=require"
     )
     return conn
+
+
 
 def send_email(recipient_email, verification_code):
     sender_email = "gourabtest469@gmail.com"
@@ -226,10 +224,27 @@ def log_prediction_to_db(email, symbol, future_date, predicted_value):
 
 email=None
 
+def ensure_user_table_exists():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Create userdata2 table if it does not exist
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS userdata2 (
+            email VARCHAR(255) PRIMARY KEY,
+            password VARCHAR(255)
+        )
+    ''')
+    conn.commit()
+    cur.close()
+    conn.close()
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # Clear the session at the start of the route to ensure verification every time
-    session.clear()
+    # Ensure table exists before querying
+    ensure_user_table_exists()
+
+    session.clear()  # Clear the session at the start of the route
 
     if request.method == 'POST':
         email = request.form['email']
@@ -237,6 +252,7 @@ def login():
 
         conn = get_db_connection()
         cur = conn.cursor()
+
         cur.execute('SELECT * FROM userdata2 WHERE email = %s', (email,))
         user = cur.fetchone()
 
@@ -245,7 +261,6 @@ def login():
             verification_code = random.randint(100000, 999999)
             send_email(email, verification_code)
 
-            # Store email and verification code in the session temporarily
             session['email'] = email
             session['verification_code'] = str(verification_code)
 
@@ -258,7 +273,6 @@ def login():
             verification_code = random.randint(100000, 999999)
             send_email(email, verification_code)
 
-            # Temporarily store email, password, and verification code in the session
             session['email'] = email
             session['password'] = password
             session['verification_code'] = str(verification_code)
@@ -267,6 +281,7 @@ def login():
             conn.close()
 
             return redirect(url_for('verify'))
+
     return render_template('login.html')
 
 @app.route('/verify', methods=['GET', 'POST'])
