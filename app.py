@@ -37,7 +37,10 @@ def is_holiday(date, country='US'):
 
 def get_db_connection():
     conn = psycopg2.connect(
-        "postgres://avnadmin:AVNS_HjYF1YDB0ilME5gCWBC@pg-2ff69ed5-gourabg30march-ae98.l.aivencloud.com:28031/defaultdb?sslmode=require"
+        host="localhost",
+        database="newDB",
+        user="postgres",
+        password="123456"
     )
     return conn
 
