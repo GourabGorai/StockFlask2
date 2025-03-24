@@ -2,6 +2,10 @@ Flask
 pandas
 requests
 scikit-learn
-psycopg2
 plotly
 gunicorn
+google-generativeai
+googletrans
+numpy
+psycopg2-binary
+Werkzeug
