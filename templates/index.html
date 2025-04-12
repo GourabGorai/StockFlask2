@@ -62,7 +62,7 @@
       padding: 1rem;
       border-radius: 0.5rem;
       margin-top: 1rem;
-      display: none;
+      {% if not chatbot_response %}display: none;{% endif %}
     }
 
     /* Updated News List Styles */
@@ -216,9 +216,11 @@
         >
         <button type="submit" class="button">Ask</button>
       </form>
-      {% if chatbot_response %}
-        <div class="chatbot-response">{{ chatbot_response|safe }}</div>
-      {% endif %}
+      <div id="chatbotResponse" class="chatbot-response">
+        {% if chatbot_response %}
+          {{ chatbot_response|safe }}
+        {% endif %}
+      </div>
     </section>
   </main>
 
@@ -260,6 +262,11 @@
       const query = document.getElementById('chatbotInput').value;
       
       if (!query) return;
+
+      // Show loading state
+      const responseDiv = document.getElementById('chatbotResponse');
+      responseDiv.style.display = 'block';
+      responseDiv.innerHTML = 'Loading response...';
 
       // Submit the form
       this.submit();
