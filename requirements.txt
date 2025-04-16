@@ -5,7 +5,7 @@ scikit-learn
 plotly
 gunicorn
 google-generativeai
-googletrans
+googletrans==3.1.0a0
 numpy
 psycopg2-binary
 Werkzeug
