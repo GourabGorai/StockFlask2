@@ -448,7 +448,14 @@ def index():
             if not stock_news:
                 return "Unable to fetch stock news. Decision cannot be made."
 
+            # Store all relevant data in session
             session['investment_decision'] = investment_decision
+            session['predicted_prices'] = predicted_prices
+            session['actual_prices'] = actual_prices
+            session['stock_news'] = stock_news
+            session['future_prediction'] = future_prediction
+            session['accuracy_score'] = accuracy_score
+            session['plot_url'] = plot_filename
 
             print("\nStock News Headlines:")
             for i, news in enumerate(stock_news, 1):
@@ -465,18 +472,39 @@ def index():
     elif request.method == 'GET':
         user_question = request.args.get('user_query')
         investment_decision2 = session.get('investment_decision', "Investment decision not available.")
+        predicted_prices2 = session.get('predicted_prices', [])
+        actual_prices2 = session.get('actual_prices', [])
+        stock_news2 = session.get('stock_news', [])
+        future_prediction2 = session.get('future_prediction')
+        accuracy_score2 = session.get('accuracy_score')
+        plot_url2 = session.get('plot_url')
 
         if user_question:
             query = f"As you have provided {session.get('investment_decision')}. Now my question is {user_question}. If the question is out of the context, only say 'out of context'."
             chatbot_response = format_investment_decision(chat_with_gemini(query))
-            return render_template('index.html', chatbot_response=chatbot_response, investment_decision=investment_decision2)
+            return render_template('index.html', 
+                                chatbot_response=chatbot_response, 
+                                investment_decision=investment_decision2,
+                                predicted_prices=predicted_prices2,
+                                actual_prices=actual_prices2,
+                                stock_news=stock_news2,
+                                future_prediction=future_prediction2,
+                                accuracy_score=accuracy_score2,
+                                plot_url=plot_url2)
         else:
-            return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
-                           error_message="No response from chatbot, please try again.", future_prediction=future_prediction,
-                           accuracy_score=accuracy_score)
+            return render_template('index.html', 
+                                predicted_prices=predicted_prices, 
+                                actual_prices=actual_prices,
+                                error_message="No response from chatbot, please try again.", 
+                                future_prediction=future_prediction,
+                                accuracy_score=accuracy_score)
 
-    return render_template('index.html', predicted_prices=predicted_prices, actual_prices=actual_prices,
-                           error_message=error_message, future_prediction=future_prediction, accuracy_score=accuracy_score)
+    return render_template('index.html', 
+                          predicted_prices=predicted_prices, 
+                          actual_prices=actual_prices,
+                          error_message=error_message, 
+                          future_prediction=future_prediction, 
+                          accuracy_score=accuracy_score)
 
 if __name__ == '__main__':
     app.run(debug=True)
