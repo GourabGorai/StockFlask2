@@ -9,7 +9,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lexend+Zetta:wght@100..900&display=swap" rel="stylesheet">
   <style>
-    /* Additional styles for functionality */
     .error-message {
       color: #E13622;
       background-color: #fee2e2;
@@ -18,37 +17,31 @@
       margin-bottom: 1rem;
       display: none;
     }
-
     .results-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 1.5rem;
       margin-top: 1rem;
     }
-
     .result-item {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
     }
-
     .result-label {
       font-size: 1rem;
       color: #4b5563;
     }
-
     .result-value {
       font-size: 1.5rem;
       font-weight: bold;
       color: #E13622;
     }
-
     .chatbot-form {
       display: flex;
       gap: 1rem;
       margin-bottom: 1rem;
     }
-
     .chatbot-input {
       flex: 1;
       padding: 0.5rem;
@@ -56,7 +49,6 @@
       border-radius: 0.375rem;
       font-size: 1rem;
     }
-
     .chatbot-response {
       background-color: #f3f4f6;
       padding: 1rem;
@@ -64,38 +56,51 @@
       margin-top: 1rem;
       {% if not chatbot_response %}display: none;{% endif %}
     }
-
-    /* Updated News List Styles */
     .news-list {
       margin-top: 1rem;
       list-style: none;
       padding: 0;
-      width: 100%; /* Make the list take full width */
+      width: 100%;
     }
-
     .news-list li {
       padding: 0.75rem;
       border-radius: 0.375rem;
       margin-bottom: 0.5rem;
       background-color: #f3f4f6;
       transition: background-color 0.2s;
-      width: 100%; /* Make each list item take full width */
+      width: 100%;
     }
-
     .news-list li:hover {
       background-color: #e5e7eb;
     }
-
-    /* Adjust the width of the news container */
     .news {
-      width: 100%; /* Make the news section take full width */
-      max-width: 1200px; /* Optional: Set a max-width for better readability */
-      margin: 0 auto; /* Center the news section */
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .result-form {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .result-form div {
+      display: flex;
+      align-items: center;
+    }
+    .result-form label {
+      min-width: 150px;
+      font-weight: bold;
+    }
+    .result-form input {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.375rem;
     }
   </style>
 </head>
 <body>
-  <!-- Header -->
   <header class="header">
     <div>
       <a href="/">HOME</a>
@@ -109,16 +114,13 @@
     </div>
   </header>
 
-  <!-- Main Content -->
   <main class="container">
-    <!-- Error Message -->
     <div id="errorMessage" class="error-message">
       {% if error_message %}
         {{ error_message }}
       {% endif %}
     </div>
 
-    <!-- Hero Section -->
     <section class="Hero">
       <video autoplay muted loop>
         <source src="static/background-video.mp4" type="video/mp4">
@@ -130,7 +132,7 @@
       </div>
     </section>
 
-    <!-- Input Section -->
+    <!-- Input Section with dropdown -->
     <section class="input" id="prediction-form">
       <div class="text">
         <h3>TRY IT OUT</h3>
@@ -140,7 +142,19 @@
         <form class="prediction-form" method="POST" action="/">
           <div>
             <label for="symbol">SYMBOL:&nbsp</label>
-            <input type="text" id="symbol" name="symbol" placeholder="Enter stock symbol" required>
+            <select id="symbol" name="symbol" required>
+              <option value="">Select a stock symbol</option>
+              <option value="AAPL">AAPL - Apple</option>
+              <option value="GOOGL">GOOGL - Alphabet</option>
+              <option value="MSFT">MSFT - Microsoft</option>
+              <option value="TSLA">TSLA - Tesla</option>
+              <option value="AMZN">AMZN - Amazon</option>
+              <option value="META">META - Meta</option>
+              <option value="NFLX">NFLX - Netflix</option>
+              <option value="NVDA">NVDA - NVIDIA</option>
+              <option value="IBM">IBM - IBM</option>
+              <option value="INTC">INTC - Intel</option>
+            </select>
           </div>
           <div>
             <label for="date">DATE:&nbsp</label>
@@ -151,6 +165,7 @@
           </div>
         </form>
       </div>
+      
     </section>
 
     <!-- Results Section -->
@@ -162,22 +177,22 @@
           <p>No plot available. Please make a prediction to view the plot.</p>
         {% endif %}
       </div>
-      <form>
+      <form class="result-form">
         <div>
           <label for="last_price">LAST KNOWN PRICE:&nbsp</label>
-          <input type="text" id="last_price" value="{{ actual_prices[-1] if actual_prices else 'N/A' }}" disabled>
+          <input type="text" id="last_price" value="{{ actual_prices[-1] if actual_prices else (session.get('actual_prices', [])[-1] if session.get('actual_prices') else 'N/A') }}" disabled>
         </div>
         <div>
           <label for="pred_price">PREDICTED PRICE:&nbsp</label>
-          <input type="text" id="pred_price" value="{{ future_prediction if future_prediction else 'N/A' }}" disabled>
+          <input type="text" id="pred_price" value="{{ future_prediction if future_prediction else (session.get('future_prediction') if session.get('future_prediction') else 'N/A') }}" disabled>
         </div>
         <div>
           <label for="pred_date">PREDICTION DATE:&nbsp</label>
-          <input type="text" id="pred_date" value="{{ date if date else 'N/A' }}" disabled>
+          <input type="text" id="pred_date" value="{{ request.form.get('future_date', 'N/A') }}" disabled>
         </div>
         <div>
           <label for="acc_rate">ACCURACY RATE:&nbsp</label>
-          <input type="text" id="acc_rate" value="{{ accuracy_score }}%" disabled>
+          <input type="text" id="acc_rate" value="{{ accuracy_score if accuracy_score else (session.get('accuracy_score') if session.get('accuracy_score') else 'N/A') }}%" disabled>
         </div>
       </form>
     </section>
@@ -186,13 +201,19 @@
     <section class="record" id="news">
       <div class="decision">
         <h1>INVESTMENT DECISION</h1>
-        <p>{{ investment_decision|safe if investment_decision else 'No decision available.' }}</p>
+        <div class="decision-content">
+          {{ investment_decision|safe if investment_decision else (session.get('investment_decision', 'No decision available.')|safe) }}
+        </div>
       </div>
       <div class="news">
         <h1>RELEVANT NEWS</h1>
         <ul class="news-list">
           {% if stock_news %}
             {% for news in stock_news %}
+              <li>{{ news }}</li>
+            {% endfor %}
+          {% elif session.get('stock_news') %}
+            {% for news in session.get('stock_news', []) %}
               <li>{{ news }}</li>
             {% endfor %}
           {% else %}
@@ -224,13 +245,11 @@
     </section>
   </main>
 
-  <!-- Footer -->
   <footer class="footer">
-    <span>© 2024 Stock Prediction. All rights reserved.</span>
+    <span>© 2025 Stock Prediction. All rights reserved.</span>
   </footer>
 
   <script>
-    // Form submission handling
     document.querySelector('.prediction-form').addEventListener('submit', function(e) {
       e.preventDefault();
       const symbol = document.getElementById('symbol').value;
@@ -240,12 +259,9 @@
         showError('Please fill in all fields');
         return;
       }
-
-      // Submit the form
       this.submit();
     });
 
-    // Error handling
     function showError(message) {
       const errorDiv = document.getElementById('errorMessage');
       errorDiv.textContent = message;
@@ -256,40 +272,33 @@
       document.getElementById('errorMessage').style.display = 'none';
     }
 
-    // Chatbot form handling
     document.getElementById('chatbotForm').addEventListener('submit', function(e) {
       e.preventDefault();
       const query = document.getElementById('chatbotInput').value;
       
       if (!query) return;
 
-      // Show loading state
       const responseDiv = document.getElementById('chatbotResponse');
       responseDiv.style.display = 'block';
       responseDiv.innerHTML = 'Loading response...';
 
-      // Submit the form
       this.submit();
     });
 
-    // Simulate loading some news
-    function loadNews() {
-      const newsList = document.getElementById('newsList');
-      news.forEach(item => {
-        const li = document.createElement('li');
-        li.textContent = item;
-        newsList.appendChild(li);
-      });
-    }
-
-    // Add animation to cards on page load and load initial data
+    // Set today's date as default in the date picker
     document.addEventListener('DOMContentLoaded', function() {
-      const cards = document.querySelectorAll('.card');
-      cards.forEach((card, index) => {
-        card.style.animationDelay = ${index * 0.1}s;
-      });
-
-      loadNews();
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('date').setAttribute('min', today);
+      
+      // Show error message if it exists
+      {% if error_message %}
+        showError('{{ error_message }}');
+      {% endif %}
+      
+      // Show chatbot response area if there's a response
+      {% if chatbot_response %}
+        document.getElementById('chatbotResponse').style.display = 'block';
+      {% endif %}
     });
   </script>
 </body>
